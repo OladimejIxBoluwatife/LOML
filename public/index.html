@@ -28,7 +28,7 @@
             height: 100%;
             overflow: hidden;
             z-index: 0;
-    }
+        }
 
         .video-background video {
             min-width: 100%;
@@ -144,12 +144,44 @@
             color: #d14d72;
         }
 
+        .progress-container {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+            display: none;
+        }
+
+        .progress-container div {
+            background-color: #f1f1f1;
+            border-radius: 25px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: #d14d72;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            border-radius: 25px;
+            transition: width 0.3s ease;
+        }
+
         footer {
             text-align: center;
             padding: 20px;
             color: #555;
             font-size: 0.9em;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 245, 250, 0.6);
         }
 
         @media (max-width: 768px) {
@@ -205,33 +237,46 @@
         <section class="upload-section">
             <h2>Share Your Moments</h2>
             <p>Upload your favorite photos/videos from our special day!</p>
-            <p>Multiple File can be uploaded at once</p>
+            <p>Multiple files can be uploaded at once</p>
             <form id="uploadForm">
                 <input type="file" id="fileInput" name="myFile" accept="image/*,video/*" multiple>
                 <button type="submit">Upload Memories</button>
             </form>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
             <p id="uploadStatus"></p>
         </section>
-
-        <footer>
-            <p>With Love, OLADIMEJI X BOLUWATIFE | April 12, 2025</p>
-        </footer>
     </div>
+
+    <footer>
+        <p>With Love, OLADIMEJI X BOLUWATIFE | April 12, 2025</p>
+    </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('uploadForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                const fileInput = document.getElementById('fileInput');
-                const files = fileInput.files;
-                const status = document.getElementById('uploadStatus');
+            const form = document.getElementById('uploadForm');
+            const fileInput = document.getElementById('fileInput');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const status = document.getElementById('uploadStatus');
 
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const files = fileInput.files;
                 if (files.length === 0) {
                     status.textContent = 'Please select at least one file!';
+                    status.style.color = '#d14d72';
                     return;
                 }
 
-                status.textContent = 'Uploading...';
+                // Reset UI
+                status.textContent = 'Uploading to Server...';
+                status.style.color = '#d14d72';
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+                progressBar.textContent = '0%';
 
                 const formData = new FormData();
                 for (let i = 0; i < files.length; i++) {
@@ -239,25 +284,69 @@
                 }
 
                 try {
-                    const response = await fetch('/upload', {
-                        method: 'POST',
-                        body: formData,
-                    });
+                    const xhr = new XMLHttpRequest();
 
-                    if (!response.ok) {
-                        throw new Error(`Network error: ${response.status} - ${response.statusText}`);
-                    }
+                    // Track browser-to-server upload progress (0% to 50%)
+                    xhr.upload.onprogress = (event) => {
+                        if (event.lengthComputable) {
+                            const percentComplete = (event.loaded / event.total) * 50;
+                            progressBar.style.width = percentComplete + '%';
+                            progressBar.textContent = Math.round(percentComplete) + '%';
+                        }
+                    };
 
-                    const data = await response.json();
-                    if (data.success) {
-                        status.textContent = data.message;
-                        document.getElementById('uploadForm').reset();
-                    } else {
-                        status.textContent = 'Upload failed: ' + (data.message || 'Unknown error');
-                    }
+                    // Handle completion of browser-to-server upload
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            // Simulate server-to-Google Drive upload progress (50% to 100%)
+                            status.textContent = 'Uploading to Google Drive...';
+                            let serverProgress = 50;
+                            const serverUploadSimulation = setInterval(() => {
+                                serverProgress += 5; // Adjust increment for smoother/slower progress
+                                if (serverProgress >= 100) {
+                                    serverProgress = 100;
+                                    clearInterval(serverUploadSimulation);
+                                }
+                                progressBar.style.width = serverProgress + '%';
+                                progressBar.textContent = Math.round(serverProgress) + '%';
+                            }, 500);
+
+                            // Parse the server response
+                            const response = JSON.parse(xhr.responseText);
+                            if (response.success) {
+                                clearInterval(serverUploadSimulation);
+                                progressBar.style.width = '100%';
+                                progressBar.textContent = '100%';
+                                status.textContent = response.message;
+                                status.style.color = 'green';
+                                form.reset();
+                            } else {
+                                clearInterval(serverUploadSimulation);
+                                status.textContent = 'Upload failed: ' + (response.message || 'Unknown error');
+                                status.style.color = 'red';
+                            }
+                        } else {
+                            status.textContent = 'Upload failed. Please try again.';
+                            status.style.color = 'red';
+                        }
+                        setTimeout(() => {
+                            progressContainer.style.display = 'none';
+                        }, 1000);
+                    };
+
+                    // Handle errors
+                    xhr.onerror = () => {
+                        status.textContent = 'An error occurred during upload.';
+                        status.style.color = 'red';
+                        progressContainer.style.display = 'none';
+                    };
+
+                    xhr.open('POST', '/upload', true);
+                    xhr.send(formData);
                 } catch (error) {
                     status.textContent = 'Error: ' + error.message;
-                    console.error('Upload error:', error);
+                    status.style.color = 'red';
+                    progressContainer.style.display = 'none';
                 }
             });
         });
