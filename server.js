@@ -1,13 +1,11 @@
-// server.js
 const express = require('express');
 const { google } = require('googleapis');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const apikeys = require('./apikeys.json');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000; // Use Render's port or default to 3000 locally
 
 // Google Drive API scope
 const SCOPE = ['https://www.googleapis.com/auth/drive'];
@@ -19,10 +17,17 @@ const upload = multer({
 
 // Authorize with Google Drive API
 async function authorize() {
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+
+  if (!clientEmail || !privateKey) {
+    throw new Error('Google Cloud credentials (GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY) must be set in environment variables.');
+  }
+
   const jwtClient = new google.auth.JWT(
-    apikeys.client_email,
+    clientEmail,
     null,
-    apikeys.private_key,
+    privateKey,
     SCOPE
   );
 
