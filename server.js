@@ -42,7 +42,7 @@ async function uploadFile(authClient, filePath, fileName) {
 
     const fileMetaData = {
       name: fileName,
-      parents: ['1PmgmVBCrN_g-Pw3Ydj-Ia3D3acllv3wV'], // Your Google Drive folder ID
+      parents: ['11hjz8L2337GOeeB0QdfyvjMZvX2cfrWm'], // Your Google Drive folder ID
     };
 
     drive.files.create({
